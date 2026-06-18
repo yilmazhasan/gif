@@ -1,264 +1,612 @@
-<!DOCTYPE html>
-
-<html>
-
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        background-color: #f0f0f0;
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GIF Maker</title>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js/dist/gif.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
         margin: 0;
-        padding: 20px;
-    }
+        padding: 0;
+      }
 
-    h3 {
+      body {
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        padding: 24px;
         color: #333;
-    }
+      }
 
-    .vstack {
+      h1 {
+        font-size: 20px;
+        margin-bottom: 20px;
+      }
+
+      .section {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      .section-title {
+        font-weight: bold;
+        margin-bottom: 12px;
+        font-size: 12px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 24px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+
+      .control-group {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 15px;
-    }
+        gap: 5px;
+      }
 
-    .hstack {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 15px;
-    }
+      .control-group label {
+        font-size: 13px;
+        color: #555;
+      }
 
-    label {
-        margin-top: 10px;
-        font-weight: bold;
-    }
-
-    select,
-    input[type="range"] {
-        margin-top: 5px;
-        padding: 5px;
-        width: 200px;
-    }
-
-    button {
-        margin-top: 15px;
-        padding: 10px 20px;
-        background-color: #007BFF;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-
-    button:hover {
-        background-color: #0056b3;
-    }
-
-    #result {
-        margin-top: 20px;
+      select,
+      input[type="number"] {
+        padding: 6px 10px;
         border: 1px solid #ccc;
-        background-color: white;
-        min-width: 100px;
-        min-height: 100px;
-        text-align: center;
-        align-content: center;
-        width: auto;
-        height: auto;
-    }
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+      }
 
-    /* Container needed to position the button. Adjust the width as needed */
-    .container {
-        position: relative;
-        width: 50%;
-    }
-
-    /* Make the image responsive */
-    .container img {
-        width: 100px;
-        height: auto;
-        position: relative;
-    }
-
-    /* Style the button and place it in the middle of the container/image */
-    .container .btn {
-        position: absolute;
-        top: 0;
-        transform: translate(-50%, -50%);
-        -ms-transform: translate(-50%, -50%);
-        background-color: transparent;
-        color: #999;
-        font-size: 16px;
-        padding: 12px 24px;
-        border: none;
+      .upload-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 2px dashed #ccc;
+        border-radius: 6px;
+        padding: 18px;
         cursor: pointer;
-        border-radius: 5px;
-        opacity: 0.8;
-    }
+        color: #007bff;
+        font-size: 14px;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+        user-select: none;
+      }
 
-    .container .btn:hover {
-        color: red;
-        opacity: 1;
-    }
-</style>
+      .upload-label:hover {
+        border-color: #007bff;
+        background: #f0f7ff;
+      }
 
+      #imageUpload {
+        display: none;
+      }
 
-<head>
-    <script src="gif.js" type="text/javascript"></script>
-    <script src="gif.worker.js" type="text/javascript"></script>
-    <!--Include map files gif.js.map -->
-</head>
+      .frame-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+      }
 
+      .frame-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #fafafa;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        padding: 8px 12px;
+      }
 
-<h3>GIF Maker</h3>
+      .frame-index {
+        font-size: 12px;
+        color: #aaa;
+        min-width: 18px;
+        text-align: right;
+      }
 
-<div class="vstack">
-    <!-- Add a slider for gif delay -->
-    <div class="hstack">
-        <div class="vstack">
-            <label for="delay">Delay:</label>
-            <span id="delayValue">500</span> ms
-            <input type="range" onchange="speedChanged()" id="delay" name="delay" min="200" max="2000" value="700">
+      .frame-thumb {
+        width: 72px;
+        height: 54px;
+        object-fit: contain;
+        background: #e8e8e8;
+        border-radius: 3px;
+        flex-shrink: 0;
+      }
+
+      .frame-name {
+        flex: 1;
+        font-size: 12px;
+        color: #777;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
+      .frame-delay {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #555;
+        flex-shrink: 0;
+      }
+
+      .frame-delay input {
+        width: 72px;
+      }
+
+      .frame-actions {
+        display: flex;
+        gap: 3px;
+        flex-shrink: 0;
+      }
+
+      button {
+        padding: 6px 14px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 0.15s;
+      }
+
+      button:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
+      .btn-primary {
+        background: #007bff;
+        color: white;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #0056b3;
+      }
+
+      .btn-secondary {
+        background: #6c757d;
+        color: white;
+      }
+      .btn-secondary:hover:not(:disabled) {
+        background: #545b62;
+      }
+
+      .btn-icon {
+        background: #efefef;
+        color: #444;
+        padding: 4px 8px;
+        font-size: 13px;
+      }
+
+      .btn-icon:hover:not(:disabled) {
+        background: #ddd;
+      }
+
+      .btn-remove {
+        background: transparent;
+        color: #cc2200;
+        padding: 4px 8px;
+        font-size: 15px;
+        line-height: 1;
+      }
+
+      .btn-remove:hover {
+        background: #ffeaea;
+        border-radius: 4px;
+      }
+
+      .action-row {
+        display: flex;
+        gap: 10px;
+      }
+
+      .status {
+        font-size: 13px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+
+      .status.info {
+        background: #e8f4fd;
+        color: #005fa3;
+      }
+      .status.success {
+        background: #e6f4e6;
+        color: #246024;
+      }
+      .status.warning {
+        background: #fff8e1;
+        color: #7a5c00;
+      }
+      .status.error {
+        background: #fdecea;
+        color: #a81010;
+      }
+      .status.hidden {
+        display: none;
+      }
+
+      #previewContainer img {
+        max-width: 100%;
+        display: block;
+        border-radius: 4px;
+      }
+
+      .empty-preview {
+        color: #bbb;
+        font-size: 14px;
+        text-align: center;
+        padding: 48px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>GIF Maker</h1>
+
+    <div class="section">
+      <div class="section-title">Settings</div>
+      <div class="controls-row">
+        <div class="control-group">
+          <label for="gifSize">Output size (max dimension)</label>
+          <select id="gifSize">
+            <option value="300">Small — 300 px</option>
+            <option value="600" selected>Medium — 600 px</option>
+            <option value="900">Large — 900 px</option>
+            <option value="1200">X-Large — 1200 px</option>
+          </select>
         </div>
-
-        <div class="vstack">
-            <label for="gifSize">GIF Size:</label>
-            <select id="gifSize" name="gifSize" onchange="sizeChanged()">
-                <option value="200">Small (200x200)</option>
-                <option value="500" selected>Medium (500x500)</option>
-                <option value="800">Large (800x800)</option>
-                <option value="1200">X-Large (1200x1200)</option>
-                <option value="1600">XX-Large (1600x1600)</option>
-            </select>
+        <div class="control-group">
+          <label for="defaultDelay">Default delay (ms)</label>
+          <input
+            type="number"
+            id="defaultDelay"
+            min="10"
+            max="60000"
+            value="500"
+            style="width: 100px"
+          />
         </div>
+      </div>
     </div>
 
-    <div class="vstack">
-        <h3>Images:</h3>
-        <input type="file" id="imageUpload" multiple accept="image/*" onchange="handleImageUpload(event)">
-        <div id="images" class="hstack">
-        </div>
+    <div class="section">
+      <div class="section-title">Frames</div>
+      <label class="upload-label" for="imageUpload">+ Add images</label>
+      <input type="file" id="imageUpload" multiple accept="image/*" />
+      <div id="frameList" class="frame-list"></div>
+      <div id="statusMsg" class="status hidden"></div>
     </div>
 
-    <button onclick="downloadGif()"> Download GIF </button>
-    <button onclick="makeGif()"> Rerender GIF </button>
-    <h3>Preview:</h3>
-    <img id="result" src="" alt="Loading..." />
-</div>
+    <div class="section">
+      <div class="action-row">
+        <button class="btn-primary" onclick="makeGif()">Render GIF</button>
+        <button class="btn-secondary" onclick="downloadGif()">
+          Download GIF
+        </button>
+      </div>
+    </div>
 
-</html>
+    <div class="section">
+      <div class="section-title">Preview</div>
+      <div id="previewContainer">
+        <div class="empty-preview">No GIF rendered yet</div>
+      </div>
+    </div>
 
-<script>
+    <script>
+      // Fetched lazily so file:// pages work without a local gif.worker.js
+      let workerBlobUrl = null;
+      async function getWorkerBlobUrl() {
+        if (workerBlobUrl) return workerBlobUrl;
+        const resp = await fetch(
+          "https://cdn.jsdelivr.net/npm/gif.js/dist/gif.worker.js"
+        );
+        if (!resp.ok) throw new Error("Failed to fetch GIF worker script");
+        const text = await resp.text();
+        workerBlobUrl = URL.createObjectURL(
+          new Blob([text], { type: "application/javascript" })
+        );
+        return workerBlobUrl;
+      }
 
-    // Settings
-    let delay = 800;
-    let gifWidth = 0;
-    let gifHeight = 0;
+      let frames = []; // { src, delay, name }
+      let detectedRatio = null; // width/height of first accepted image
+      let gifBlobUrl = null;
 
-    function getHtmlElementForImage(src) {
-        const div = document.createElement('div');
-        div.className = 'container';
-        const img = document.createElement('img');
-        img.src = src;
-        img.alt = 'Image';
-        const button = document.createElement('button');
-        button.className = 'btn';
-        button.innerText = 'X';
-        button.onclick = function () {
-            div.remove();
+      const RATIO_TOLERANCE = 0.1; // 10%
+
+      document
+        .getElementById("imageUpload")
+        .addEventListener("change", handleImageUpload);
+
+      function sameRatio(r1, r2) {
+        return Math.abs(r1 - r2) / r1 <= RATIO_TOLERANCE;
+      }
+
+      function loadImage(src) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Failed to load image"));
+          img.src = src;
+        });
+      }
+
+      function handleImageUpload(event) {
+        const files = Array.from(event.target.files);
+        event.target.value = "";
+        if (!files.length) return;
+
+        const defaultDelay = Math.max(
+          10,
+          parseInt(document.getElementById("defaultDelay").value) || 500
+        );
+        let skipped = 0;
+        let loaded = 0;
+
+        files.forEach((file) => {
+          const src = URL.createObjectURL(file);
+          const img = new Image();
+
+          img.onload = () => {
+            const ratio = img.naturalWidth / img.naturalHeight;
+            if (detectedRatio === null) detectedRatio = ratio;
+
+            if (!sameRatio(ratio, detectedRatio)) {
+              skipped++;
+              URL.revokeObjectURL(src);
+            } else {
+              frames.push({ src, delay: defaultDelay, name: file.name });
+            }
+
+            if (++loaded === files.length) {
+              renderFrameList();
+              if (skipped > 0) {
+                showStatus(
+                  `${skipped} image(s) skipped — aspect ratio too different from ${ratioLabel(detectedRatio)} (tolerance ±10%).`,
+                  "warning"
+                );
+              } else {
+                hideStatus();
+              }
+            }
+          };
+
+          img.onerror = () => {
+            skipped++;
+            if (++loaded === files.length) renderFrameList();
+          };
+
+          img.src = src;
+        });
+      }
+
+      function ratioLabel(r) {
+        const common = [
+          [16, 9],
+          [4, 3],
+          [3, 2],
+          [1, 1],
+          [2, 3],
+          [3, 4],
+          [9, 16]
+        ];
+        for (const [w, h] of common) {
+          if (Math.abs(r - w / h) < 0.05) return `${w}:${h}`;
         }
-        div.appendChild(img);
-        div.appendChild(button);
-        return div;
-    }
+        return r.toFixed(2);
+      }
 
-    function setGifSize(files) {
-        gifWidth = 500;
-        gifHeight = 500;
-    }
+      function renderFrameList() {
+        const list = document.getElementById("frameList");
+        list.innerHTML = "";
 
-    function handleImageUpload(event) {
-        const files = event.target.files;
-
-        const imagesDiv = document.getElementById('images');
-        // imagesDiv.innerHTML = ''; // Clear previous images
-
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const fileURI = URL.createObjectURL(file);
-
-            // Save file to local files to get a file path
-            const div = getHtmlElementForImage(fileURI);
-
-            imagesDiv.appendChild(div);
+        if (!frames.length) {
+          detectedRatio = null;
+          return;
         }
 
-        setGifSize(files);
-    }
+        frames.forEach((frame, i) => {
+          const card = document.createElement("div");
+          card.className = "frame-card";
 
-    function sizeChanged() {
-        clearGif();
-        gifSize = document.getElementById('gifSize').value;
-        makeGif();
-    }
+          const idx = el("span", "frame-index", String(i + 1));
 
-    function speedChanged() {
-        clearGif();
-        delay = parseInt(document.getElementById('delay').value);
-        document.getElementById('delayValue').innerText = delay;
-        makeGif();
-    }
+          const thumb = document.createElement("img");
+          thumb.className = "frame-thumb";
+          thumb.src = frame.src;
+          thumb.alt = "";
 
-    function downloadGif() {
-        const img = document.getElementById('result');
-        const url = img.src;
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'myGif.gif';
+          const name = el("div", "frame-name", frame.name);
+
+          const delayWrap = document.createElement("div");
+          delayWrap.className = "frame-delay";
+          delayWrap.appendChild(el("span", "", "Delay:"));
+          const delayInput = document.createElement("input");
+          delayInput.type = "number";
+          delayInput.min = "10";
+          delayInput.max = "60000";
+          delayInput.value = frame.delay;
+          delayInput.addEventListener("change", () => {
+            frames[i].delay = Math.max(10, parseInt(delayInput.value) || 500);
+            delayInput.value = frames[i].delay;
+          });
+          delayWrap.appendChild(delayInput);
+          delayWrap.appendChild(el("span", "", "ms"));
+
+          const actions = document.createElement("div");
+          actions.className = "frame-actions";
+
+          const upBtn = document.createElement("button");
+          upBtn.className = "btn-icon";
+          upBtn.textContent = "↑";
+          upBtn.title = "Move up";
+          upBtn.disabled = i === 0;
+          upBtn.onclick = () => {
+            swap(i - 1, i);
+            renderFrameList();
+          };
+
+          const downBtn = document.createElement("button");
+          downBtn.className = "btn-icon";
+          downBtn.textContent = "↓";
+          downBtn.title = "Move down";
+          downBtn.disabled = i === frames.length - 1;
+          downBtn.onclick = () => {
+            swap(i, i + 1);
+            renderFrameList();
+          };
+
+          const removeBtn = document.createElement("button");
+          removeBtn.className = "btn-remove";
+          removeBtn.textContent = "×";
+          removeBtn.title = "Remove";
+          removeBtn.onclick = () => {
+            URL.revokeObjectURL(frame.src);
+            frames.splice(i, 1);
+            if (!frames.length) detectedRatio = null;
+            renderFrameList();
+          };
+
+          actions.append(upBtn, downBtn, removeBtn);
+          card.append(idx, thumb, name, delayWrap, actions);
+          list.appendChild(card);
+        });
+      }
+
+      function swap(a, b) {
+        [frames[a], frames[b]] = [frames[b], frames[a]];
+      }
+
+      function el(tag, className, text) {
+        const e = document.createElement(tag);
+        if (className) e.className = className;
+        if (text != null) e.textContent = text;
+        return e;
+      }
+
+      // Center-crop src image onto canvas at target dimensions, preserving content
+      function drawCropped(ctx, img, targetW, targetH) {
+        const imgRatio = img.naturalWidth / img.naturalHeight;
+        const targetRatio = targetW / targetH;
+        let sx, sy, sw, sh;
+        if (imgRatio > targetRatio) {
+          // Image is wider than target — crop left/right
+          sh = img.naturalHeight;
+          sw = sh * targetRatio;
+          sx = (img.naturalWidth - sw) / 2;
+          sy = 0;
+        } else {
+          // Image is taller than target — crop top/bottom
+          sw = img.naturalWidth;
+          sh = sw / targetRatio;
+          sx = 0;
+          sy = (img.naturalHeight - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+      }
+
+      async function makeGif() {
+        if (!frames.length) {
+          showStatus("Add at least one image.", "error");
+          return;
+        }
+
+        showStatus("Rendering…", "info");
+        document.getElementById("previewContainer").innerHTML =
+          '<div class="empty-preview">Rendering…</div>';
+
+        try {
+          const maxDim = parseInt(document.getElementById("gifSize").value);
+
+          const firstImg = await loadImage(frames[0].src);
+          const ratio = firstImg.naturalWidth / firstImg.naturalHeight;
+          const [w, h] =
+            ratio >= 1
+              ? [maxDim, Math.round(maxDim / ratio)]
+              : [Math.round(maxDim * ratio), maxDim];
+
+          const imgs = await Promise.all(frames.map((f) => loadImage(f.src)));
+
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+
+          const gif = new GIF({
+            workers: 2,
+            quality: 10,
+            width: w,
+            height: h,
+            workerScript: await getWorkerBlobUrl()
+          });
+
+          imgs.forEach((img, i) => {
+            ctx.clearRect(0, 0, w, h);
+            drawCropped(ctx, img, w, h);
+            gif.addFrame(ctx, { copy: true, delay: frames[i].delay });
+          });
+
+          gif.on("finished", (blob) => {
+            if (gifBlobUrl) URL.revokeObjectURL(gifBlobUrl);
+            gifBlobUrl = URL.createObjectURL(blob);
+            const container = document.getElementById("previewContainer");
+            container.innerHTML = "";
+            const img = document.createElement("img");
+            img.src = gifBlobUrl;
+            container.appendChild(img);
+            showStatus(
+              `Done — ${frames.length} frame(s), ${w}×${h} px.`,
+              "success"
+            );
+          });
+
+          gif.on("error", (err) => showStatus("Render error: " + err, "error"));
+
+          gif.render();
+        } catch (e) {
+          showStatus("Error: " + e.message, "error");
+        }
+      }
+
+      function downloadGif() {
+        if (!gifBlobUrl) {
+          showStatus("Render a GIF first.", "error");
+          return;
+        }
+        const a = document.createElement("a");
+        a.href = gifBlobUrl;
+        a.download = "output.gif";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-    }
+      }
 
-    function clearGif() {
-        const img = document.getElementById('result');
-        img.src = 'Loading...';
-    }
+      function showStatus(msg, type) {
+        const el = document.getElementById("statusMsg");
+        el.textContent = msg;
+        el.className = "status " + type;
+      }
 
-    function makeGif() {
-
-        console.log(gifWidth, gifHeight)
-
-        const gif = new GIF({
-            workers: 2,
-            quality: 5,
-            width: gifWidth,
-            height: gifHeight
-        });
-
-        const imagesDiv = document.getElementById('images');
-        const imageURIs = [];
-
-        imagesDiv.childNodes.forEach((child) => {
-            if (child.className === 'container') {
-                const imgSrc = child.querySelector('img').src;
-                imageURIs.push(imgSrc);
-            }
-        });
-
-        imageURIs.forEach((imgURI) => {
-            console.log(`Adding image: ${imgURI}`);
-            const img = new Image();
-            img.src = imgURI;
-
-            gif.addFrame(img, { delay: delay })
-        })
-
-        gif.on("finished", (blob) => {
-            const url = URL.createObjectURL(blob);
-            document.getElementById('result').src = url;
-        });
-
-        gif.render();
-    }
-
-</script>
+      function hideStatus() {
+        document.getElementById("statusMsg").className = "status hidden";
+      }
+    </script>
+  </body>
+</html>
