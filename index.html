@@ -282,6 +282,36 @@
             style="width: 100px"
           />
         </div>
+        <div class="control-group">
+          <label for="ratioTolerance">Ratio tolerance (%)</label>
+          <input
+            type="number"
+            id="ratioTolerance"
+            min="0"
+            max="100"
+            value="10"
+            style="width: 100px"
+          />
+        </div>
+        <div class="control-group" id="fitModeGroup">
+          <label for="fitMode">Mismatched ratio handling</label>
+          <select id="fitMode">
+            <option value="crop" selected>Crop to fit</option>
+            <option value="pad">Pad with background</option>
+          </select>
+        </div>
+        <div class="control-group" id="padColorGroup">
+          <label for="padColor">Pad background</label>
+          <select id="padColor">
+            <option value="#ffffff" selected>White</option>
+            <option value="#000000">Black</option>
+            <option value="custom">Custom color</option>
+          </select>
+        </div>
+        <div class="control-group" id="customPadColorGroup">
+          <label for="customPadColor">Custom color</label>
+          <input type="color" id="customPadColor" value="#ffffff" />
+        </div>
       </div>
     </div>
 
@@ -325,18 +355,76 @@
         return workerBlobUrl;
       }
 
-      let frames = []; // { src, delay, name }
+      let frames = []; // { src, delay, name, customDelay }
       let detectedRatio = null; // width/height of first accepted image
       let gifBlobUrl = null;
-
-      const RATIO_TOLERANCE = 0.1; // 10%
 
       document
         .getElementById("imageUpload")
         .addEventListener("change", handleImageUpload);
 
+      document
+        .getElementById("defaultDelay")
+        .addEventListener("change", handleDefaultDelayChange);
+
+      document
+        .getElementById("ratioTolerance")
+        .addEventListener("change", updateFitModeVisibility);
+
+      document
+        .getElementById("fitMode")
+        .addEventListener("change", updateFitModeVisibility);
+
+      document
+        .getElementById("padColor")
+        .addEventListener("change", updateFitModeVisibility);
+
+      updateFitModeVisibility();
+
+      function getPadColor() {
+        const select = document.getElementById("padColor");
+        return select.value === "custom"
+          ? document.getElementById("customPadColor").value
+          : select.value;
+      }
+
+      function getRatioTolerance() {
+        const pct = Math.min(
+          100,
+          Math.max(0, parseFloat(document.getElementById("ratioTolerance").value) || 0)
+        );
+        return pct / 100;
+      }
+
+      function updateFitModeVisibility() {
+        const showFitMode = getRatioTolerance() > 0;
+        document.getElementById("fitModeGroup").style.display = showFitMode
+          ? ""
+          : "none";
+        const showPadColor =
+          showFitMode && document.getElementById("fitMode").value === "pad";
+        document.getElementById("padColorGroup").style.display = showPadColor
+          ? ""
+          : "none";
+
+        const showCustomColor =
+          showPadColor && document.getElementById("padColor").value === "custom";
+        document.getElementById("customPadColorGroup").style.display =
+          showCustomColor ? "" : "none";
+      }
+
+      function handleDefaultDelayChange() {
+        const input = document.getElementById("defaultDelay");
+        const value = Math.max(10, parseInt(input.value) || 500);
+        input.value = value;
+        frames.forEach((frame) => {
+          if (!frame.customDelay) frame.delay = value;
+        });
+        renderFrameList();
+      }
+
       function sameRatio(r1, r2) {
-        return Math.abs(r1 - r2) / r1 <= RATIO_TOLERANCE;
+        return Math.abs(r1 - r2) / r1 <= getRatioTolerance();
       }
 
       function loadImage(src) {
@@ -372,14 +460,20 @@
               skipped++;
               URL.revokeObjectURL(src);
             } else {
-              frames.push({ src, delay: defaultDelay, name: file.name });
+              frames.push({
+                src,
+                delay: defaultDelay,
+                name: file.name,
+                customDelay: false
+              });
             }
 
             if (++loaded === files.length) {
               renderFrameList();
               if (skipped > 0) {
+                const tolPct = Math.round(getRatioTolerance() * 100);
                 showStatus(
-                  `${skipped} image(s) skipped — aspect ratio too different from ${ratioLabel(detectedRatio)} (tolerance ±10%).`,
+                  `${skipped} image(s) skipped — aspect ratio too different from ${ratioLabel(detectedRatio)} (tolerance ±${tolPct}%).`,
                   "warning"
                 );
               } else {
@@ -445,6 +539,7 @@
           delayInput.value = frame.delay;
           delayInput.addEventListener("change", () => {
             frames[i].delay = Math.max(10, parseInt(delayInput.value) || 500);
+            frames[i].customDelay = true;
             delayInput.value = frames[i].delay;
           });
           delayWrap.appendChild(delayInput);
@@ -522,6 +617,29 @@
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
       }
 
+      // Fit src image inside canvas at target dimensions without cropping,
+      // filling the surrounding area with bgColor (letterbox/pillarbox).
+      function drawFitted(ctx, img, targetW, targetH, bgColor) {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, targetW, targetH);
+
+        const imgRatio = img.naturalWidth / img.naturalHeight;
+        const targetRatio = targetW / targetH;
+        let dw, dh, dx, dy;
+        if (imgRatio > targetRatio) {
+          dw = targetW;
+          dh = dw / imgRatio;
+          dx = 0;
+          dy = (targetH - dh) / 2;
+        } else {
+          dh = targetH;
+          dw = dh * imgRatio;
+          dy = 0;
+          dx = (targetW - dw) / 2;
+        }
+        ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, dx, dy, dw, dh);
+      }
+
       async function makeGif() {
         if (!frames.length) {
           showStatus("Add at least one image.", "error");
@@ -549,6 +667,12 @@
           canvas.height = h;
           const ctx = canvas.getContext("2d");
 
+          const fitMode =
+            getRatioTolerance() > 0
+              ? document.getElementById("fitMode").value
+              : "crop";
+          const padColor = getPadColor();
+
           const gif = new GIF({
             workers: 2,
             quality: 10,
@@ -559,7 +683,11 @@
 
           imgs.forEach((img, i) => {
             ctx.clearRect(0, 0, w, h);
-            drawCropped(ctx, img, w, h);
+            if (fitMode === "pad") {
+              drawFitted(ctx, img, w, h, padColor);
+            } else {
+              drawCropped(ctx, img, w, h);
+            }
             gif.addFrame(ctx, { copy: true, delay: frames[i].delay });
           });
 
