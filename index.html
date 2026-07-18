@@ -254,6 +254,52 @@
         text-align: center;
         padding: 48px 0;
       }
+
+      @media (max-width: 600px) {
+        body {
+          padding: 12px;
+        }
+
+        .controls-row {
+          gap: 12px 20px;
+        }
+
+        .action-row {
+          flex-wrap: wrap;
+        }
+
+        .action-row button {
+          flex: 1 1 auto;
+        }
+
+        button {
+          padding: 10px 16px;
+        }
+
+        .frame-card {
+          flex-wrap: wrap;
+          gap: 8px 12px;
+        }
+
+        .frame-name {
+          flex-basis: 100%;
+          order: 1;
+        }
+
+        .frame-delay {
+          order: 2;
+        }
+
+        .frame-actions {
+          order: 3;
+          margin-left: auto;
+        }
+
+        .btn-icon,
+        .btn-remove {
+          padding: 8px 10px;
+        }
+      }
     </style>
   </head>
   <body>
