@@ -107,8 +107,25 @@
         gap: 12px;
         background: #fafafa;
         border: 1px solid #eee;
+        border-top: 2px solid transparent;
         border-radius: 6px;
         padding: 8px 12px;
+        cursor: grab;
+      }
+
+      .frame-card.dragging {
+        opacity: 0.4;
+      }
+
+      .frame-card.drag-over {
+        border-top-color: #007bff;
+      }
+
+      .drag-handle {
+        color: #bbb;
+        font-size: 14px;
+        flex-shrink: 0;
+        cursor: grab;
       }
 
       .frame-index {
@@ -215,6 +232,16 @@
         gap: 10px;
       }
 
+      .frames-toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .frames-toolbar .upload-label {
+        flex: 1;
+      }
+
       .status {
         font-size: 13px;
         padding: 8px 12px;
@@ -274,6 +301,10 @@
 
         button {
           padding: 10px 16px;
+        }
+
+        .frames-toolbar {
+          flex-wrap: wrap;
         }
 
         .frame-card {
@@ -358,13 +389,42 @@
           <label for="customPadColor">Custom color</label>
           <input type="color" id="customPadColor" value="#ffffff" />
         </div>
+        <div class="control-group">
+          <label for="repeatMode">Repeat</label>
+          <select id="repeatMode">
+            <option value="0" selected>Loop forever</option>
+            <option value="-1">Play once</option>
+            <option value="custom">Custom count</option>
+          </select>
+        </div>
+        <div class="control-group" id="repeatCountGroup">
+          <label for="repeatCount">Repeat count (after first play)</label>
+          <input
+            type="number"
+            id="repeatCount"
+            min="0"
+            max="1000"
+            value="1"
+            style="width: 100px"
+          />
+        </div>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Frames</div>
-      <label class="upload-label" for="imageUpload">+ Add images</label>
-      <input type="file" id="imageUpload" multiple accept="image/*" />
+      <div class="frames-toolbar">
+        <label class="upload-label" for="imageUpload">+ Add images</label>
+        <input type="file" id="imageUpload" multiple accept="image/*" />
+        <button
+          class="btn-secondary"
+          id="clearAllBtn"
+          onclick="clearAllFrames()"
+          disabled
+        >
+          Clear all
+        </button>
+      </div>
       <div id="frameList" class="frame-list"></div>
       <div id="statusMsg" class="status hidden"></div>
     </div>
@@ -425,7 +485,31 @@
         .getElementById("padColor")
         .addEventListener("change", updateFitModeVisibility);
 
+      document
+        .getElementById("repeatMode")
+        .addEventListener("change", updateRepeatVisibility);
+
       updateFitModeVisibility();
+      updateRepeatVisibility();
+
+      function updateRepeatVisibility() {
+        const showCustom =
+          document.getElementById("repeatMode").value === "custom";
+        document.getElementById("repeatCountGroup").style.display = showCustom
+          ? ""
+          : "none";
+      }
+
+      function getRepeat() {
+        const mode = document.getElementById("repeatMode").value;
+        if (mode === "custom") {
+          return Math.max(
+            0,
+            parseInt(document.getElementById("repeatCount").value) || 0
+          );
+        }
+        return parseInt(mode);
+      }
 
       function getPadColor() {
         const select = document.getElementById("padColor");
@@ -510,7 +594,8 @@
                 src,
                 delay: defaultDelay,
                 name: file.name,
-                customDelay: false
+                customDelay: false,
+                ratio
               });
             }
 
@@ -553,18 +638,52 @@
         return r.toFixed(2);
       }
 
+      function recalcDetectedRatio() {
+        detectedRatio = frames.length ? frames[0].ratio : null;
+      }
+
+      let dragSrcIndex = null;
+
       function renderFrameList() {
+        recalcDetectedRatio();
+
         const list = document.getElementById("frameList");
         list.innerHTML = "";
+        document.getElementById("clearAllBtn").disabled = !frames.length;
 
-        if (!frames.length) {
-          detectedRatio = null;
-          return;
-        }
+        if (!frames.length) return;
 
         frames.forEach((frame, i) => {
           const card = document.createElement("div");
           card.className = "frame-card";
+          card.draggable = true;
+
+          card.addEventListener("dragstart", () => {
+            dragSrcIndex = i;
+            card.classList.add("dragging");
+          });
+          card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+          });
+          card.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            card.classList.add("drag-over");
+          });
+          card.addEventListener("dragleave", () => {
+            card.classList.remove("drag-over");
+          });
+          card.addEventListener("drop", (e) => {
+            e.preventDefault();
+            card.classList.remove("drag-over");
+            if (dragSrcIndex === null || dragSrcIndex === i) return;
+            const [moved] = frames.splice(dragSrcIndex, 1);
+            const targetIndex = dragSrcIndex < i ? i - 1 : i;
+            frames.splice(targetIndex, 0, moved);
+            dragSrcIndex = null;
+            renderFrameList();
+          });
+
+          const dragHandle = el("span", "drag-handle", "⠿");
 
           const idx = el("span", "frame-index", String(i + 1));
 
@@ -621,18 +740,24 @@
           removeBtn.onclick = () => {
             URL.revokeObjectURL(frame.src);
             frames.splice(i, 1);
-            if (!frames.length) detectedRatio = null;
             renderFrameList();
           };
 
           actions.append(upBtn, downBtn, removeBtn);
-          card.append(idx, thumb, name, delayWrap, actions);
+          card.append(dragHandle, idx, thumb, name, delayWrap, actions);
           list.appendChild(card);
         });
       }
 
       function swap(a, b) {
         [frames[a], frames[b]] = [frames[b], frames[a]];
+      }
+
+      function clearAllFrames() {
+        frames.forEach((f) => URL.revokeObjectURL(f.src));
+        frames = [];
+        renderFrameList();
+        hideStatus();
       }
 
       function el(tag, className, text) {
@@ -724,6 +849,7 @@
             quality: 10,
             width: w,
             height: h,
+            repeat: getRepeat(),
             workerScript: await getWorkerBlobUrl()
           });
 
